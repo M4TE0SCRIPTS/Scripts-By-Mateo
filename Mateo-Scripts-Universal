@@ -1,0 +1,429 @@
+-- Loading PulseUI Library from the official repository
+local PulseUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/M4TE0SCRIPTS/PulseUI/refs/heads/main/PulseUI.source"))()
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SoundService = game:GetService("SoundService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+--------------------------------------------------------------------------------
+-- SOUND EFFECTS SETUP
+--------------------------------------------------------------------------------
+local function playSound(soundId, volume)
+    local sound = Instance.new("Sound")
+    sound.SoundId = soundId
+    sound.Volume = volume or 0.5
+    sound.Parent = SoundService
+    sound:Play()
+    sound.Ended:Connect(function()
+        sound:Destroy()
+    end)
+end
+
+--------------------------------------------------------------------------------
+-- STATES CONFIGURATION
+--------------------------------------------------------------------------------
+local InvisOn = false
+local GhostOn = false
+local GhostSpeed = 50
+local TouchFlingActive = false
+
+-- Main Window (Updated Name)
+local Window = PulseUI:CreateWindow({
+    Title = "ScriptsByMateo | Universal Script",
+    Subtitle = "Developed by MateoScripts",
+    Icon = "",
+    Theme = "Dark",
+    RGBBorder = true,
+    Draggable = true,
+    Resizable = true,
+    Stats = false,
+    ToggleKey = Enum.KeyCode.RightControl,
+    Button = {
+        Text = "UI",
+        RGB = true,
+        Visible = true
+    },
+    LoadingScreen = {
+        Title = "Loading ScriptsByMateo...",
+        Subtitle = "Initializing components...",
+        Duration = 2
+    }
+})
+
+-- Tabs with Emojis only
+local MainTab = Window:AddTab("Main 🏠", "")
+local PlayerTab = Window:AddTab("Player 🏃", "")
+local InvisTab = Window:AddTab("Invisibility 👻", "")
+local FlingTab = Window:AddTab("Fling 💥", "")
+local VisualsTab = Window:AddTab("Visuals 👁️", "")
+local ChatTab = Window:AddTab("Chat 💬", "")
+local MiscTab = Window:AddTab("Settings ⚙️", "")
+
+--------------------------------------------------------------------------------
+-- FUNCTIONS LOGIC
+--------------------------------------------------------------------------------
+
+-- 1. Noclip
+local NoclipEnabled = false
+RunService.Stepped:Connect(function()
+    if NoclipEnabled and LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- 2. Infinite Jump
+local InfJumpEnabled = false
+UserInputService.JumpRequest:Connect(function()
+    if InfJumpEnabled then
+        local hum = PulseUI.Utils.GetHumanoid()
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+-- 3. Toggle Invisibility
+local function setTransparency(char, val)
+    for _, p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+            p.Transparency = val
+        end
+    end
+end
+
+local function SetInvisState(state)
+    InvisOn = state
+    playSound("rbxassetid://906086442", 0.6)
+    local char = LocalPlayer.Character
+    if char then
+        if InvisOn then
+            setTransparency(char, 0.5)
+            local savedpos = char.HumanoidRootPart.CFrame
+            task.wait()
+            char:MoveTo(Vector3.new(-25.95, 84, 3537.55))
+            task.wait(0.15)
+            local Seat = Instance.new("Seat", workspace)
+            Seat.Anchored = false
+            Seat.CanCollide = false
+            Seat.Name = "invischair"
+            Seat.Transparency = 1
+            Seat.Position = Vector3.new(-25.95, 84, 3537.55)
+            local Weld = Instance.new("Weld", Seat)
+            Weld.Part0 = Seat
+            Weld.Part1 = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+            Seat.CFrame = savedpos
+            PulseUI:Notify({ Title = "Invisibility", Content = "Invisibility Enabled", Type = "Success", Duration = 3 })
+        else
+            setTransparency(char, 0)
+            if workspace:FindFirstChild("invischair") then
+                workspace.invischair:Destroy()
+            end
+            PulseUI:Notify({ Title = "Invisibility", Content = "Invisibility Disabled", Type = "Info", Duration = 3 })
+        end
+    end
+end
+
+-- 4. Ghost Speed Enforced
+local GhostEnforceConn
+local function ToggleGhost()
+    GhostOn = not GhostOn
+    playSound("rbxassetid://906086442", 0.6)
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        if GhostOn then
+            hum.WalkSpeed = GhostSpeed
+            if GhostEnforceConn then
+                pcall(function() GhostEnforceConn:Disconnect() end)
+                GhostEnforceConn = nil
+            end
+            GhostEnforceConn = RunService.Stepped:Connect(function()
+                if hum and hum.WalkSpeed ~= GhostSpeed then
+                    pcall(function() hum.WalkSpeed = GhostSpeed end)
+                end
+            end)
+            PulseUI:Notify({ Title = "Ghost Speed", Content = "Enabled: " .. tostring(GhostSpeed), Type = "Success", Duration = 3 })
+        else
+            if GhostEnforceConn then
+                pcall(function() GhostEnforceConn:Disconnect() end)
+                GhostEnforceConn = nil
+            end
+            hum.WalkSpeed = 16
+            PulseUI:Notify({ Title = "Ghost Speed", Content = "Disabled", Type = "Info", Duration = 3 })
+        end
+    end
+end
+
+-- 5. Touch Fling Logic
+if not ReplicatedStorage:FindFirstChild("juisdfj0i32i0eidsuf0iok") then
+    local detection = Instance.new("Decal")
+    detection.Name = "juisdfj0i32i0eidsuf0iok"
+    detection.Parent = ReplicatedStorage
+end
+
+local function startTouchFling(state)
+    TouchFlingActive = state
+    playSound("rbxassetid://906086442", 0.6)
+    if TouchFlingActive then
+        task.spawn(function()
+            local movel = 0.1
+            while TouchFlingActive do
+                RunService.Heartbeat:Wait()
+                local c = LocalPlayer.Character
+                local hrp = c and c:FindFirstChild("HumanoidRootPart")
+
+                if hrp then
+                    local vel = hrp.Velocity
+                    hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+                    RunService.RenderStepped:Wait()
+                    hrp.Velocity = vel
+                    RunService.Stepped:Wait()
+                    hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                    movel = -movel
+                end
+            end
+        end)
+        PulseUI:Notify({
+            Title = "Fling Enabled",
+            Content = "Fling enabled - developed by MateoScripts",
+            Type = "Success",
+            Duration = 3
+        })
+    else
+        TouchFlingActive = false
+        PulseUI:Notify({
+            Title = "Fling Disabled",
+            Content = "Fling disabled - developed by MateoScripts",
+            Type = "Info",
+            Duration = 3
+        })
+    end
+end
+
+-- Hotkeys (Z for Invis, B for Ghost)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.Z then
+        SetInvisState(not InvisOn)
+    elseif input.KeyCode == Enum.KeyCode.B then
+        ToggleGhost()
+    end
+end)
+
+-- 6. ESP Highlight
+local EspHighlightEnabled = false
+local EspHighlightColor = Color3.fromRGB(255, 0, 0)
+local Highlights = {}
+
+local function ApplyHighlight(player)
+    if player == LocalPlayer then return end
+    local function setupChar(char)
+        if not char then return end
+        local hl = char:FindFirstChild("ScriptsByMateo_Highlight") or Instance.new("Highlight")
+        hl.Name = "ScriptsByMateo_Highlight"
+        hl.Adornee = char
+        hl.FillColor = EspHighlightColor
+        hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+        hl.FillTransparency = 0.5
+        hl.OutlineTransparency = 0
+        hl.Enabled = EspHighlightEnabled
+        hl.Parent = char
+        Highlights[player] = hl
+    end
+    if player.Character then setupChar(player.Character) end
+    player.CharacterAdded:Connect(setupChar)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do ApplyHighlight(p) end
+Players.PlayerAdded:Connect(ApplyHighlight)
+
+-- 7. Chat Functions
+local SpamText = "ScriptsByMateo in Control!"
+local SpamDelay = 2
+local SpamActive = false
+local ManualText = ""
+
+local function SendChatMessage(msg)
+    if msg == "" then return end
+    playSound("rbxassetid://4590657391", 0.4)
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+        if channel then channel:SendAsync(msg) end
+    else
+        ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+            :FindFirstChild("SayMessageRequest"):FireServer(msg, "All")
+    end
+end
+
+--------------------------------------------------------------------------------
+-- USER INTERFACE
+--------------------------------------------------------------------------------
+
+MainTab:AddSection("General Options")
+MainTab:AddButton({
+    Name = "Test Notification",
+    Callback = function()
+        playSound("rbxassetid://6029744634", 0.5)
+        PulseUI:Notify({ Title = "ScriptsByMateo", Content = "Script ready!", Type = "Success", Duration = 3 })
+    end
+})
+
+-- PLAYER
+PlayerTab:AddSection("Movement")
+
+PlayerTab:AddToggle({
+    Name = "Noclip",
+    Default = false,
+    Flag = "NoclipToggle",
+    Callback = function(Value)
+        playSound("rbxassetid://906086442", 0.5)
+        NoclipEnabled = Value
+    end
+})
+
+PlayerTab:AddToggle({
+    Name = "Infinite Jump",
+    Default = false,
+    Flag = "InfJumpToggle",
+    Callback = function(Value)
+        playSound("rbxassetid://906086442", 0.5)
+        InfJumpEnabled = Value
+    end
+})
+
+PlayerTab:AddSlider({
+    Name = "WalkSpeed",
+    Min = 16,
+    Max = 200,
+    Increment = 1,
+    Default = 16,
+    Callback = function(Value)
+        local hum = PulseUI.Utils.GetHumanoid()
+        if hum then hum.WalkSpeed = Value end
+    end
+})
+
+-- INVISIBILITY TAB
+InvisTab:AddSection("Ghost / Invis Controls")
+
+InvisTab:AddToggle({
+    Name = "Invisibility (Key Z)",
+    Default = false,
+    Flag = "InvisToggle",
+    Callback = function(Value)
+        SetInvisState(Value)
+    end
+})
+
+InvisTab:AddToggle({
+    Name = "Ghost Speed (Key B)",
+    Default = false,
+    Flag = "GhostSpeedToggle",
+    Callback = function(Value)
+        ToggleGhost()
+    end
+})
+
+InvisTab:AddTextBox({
+    Name = "Adjust Ghost Speed",
+    Default = tostring(GhostSpeed),
+    Placeholder = "Speed...",
+    ClearOnFocusLost = false,
+    Callback = function(Text)
+        local val = tonumber(Text)
+        if val and val > 0 then
+            GhostSpeed = val
+            if GhostOn then
+                local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if hum then hum.WalkSpeed = GhostSpeed end
+            end
+        end
+    end
+})
+
+-- FLING TAB
+FlingTab:AddSection("Touch Fling Tool")
+
+FlingTab:AddToggle({
+    Name = "Touch Fling (Touch to Fling)",
+    Default = false,
+    Flag = "TouchFlingToggle",
+    Callback = function(Value)
+        startTouchFling(Value)
+    end
+})
+
+-- VISUALS
+VisualsTab:AddSection("ESP Visuals")
+
+VisualsTab:AddToggle({
+    Name = "ESP Highlight",
+    Default = false,
+    Flag = "EspHighlightToggle",
+    Callback = function(Value)
+        playSound("rbxassetid://906086442", 0.5)
+        EspHighlightEnabled = Value
+        for _, hl in pairs(Highlights) do
+            if hl then hl.Enabled = EspHighlightEnabled end
+        end
+    end
+})
+
+VisualsTab:AddColorPicker({
+    Name = "ESP Highlight Color",
+    Default = Color3.fromRGB(255, 0, 0),
+    Flag = "EspHighlightColorPicker",
+    Callback = function(Color)
+        EspHighlightColor = Color
+        for _, hl in pairs(Highlights) do
+            if hl then hl.FillColor = EspHighlightColor end
+        end
+    end
+})
+
+-- CHAT
+ChatTab:AddSection("Manual Chat")
+ChatTab:AddTextBox({ Name = "Manual Message", Placeholder = "Type your message...", ClearOnFocusLost = false, Callback = function(Text) ManualText = Text end })
+ChatTab:AddButton({ Name = "Send Message", Callback = function() SendChatMessage(ManualText) end })
+
+ChatTab:AddSection("Chat Spam")
+ChatTab:AddTextBox({ Name = "Spam Text", Default = "ScriptsByMateo in Control!", ClearOnFocusLost = false, Callback = function(Text) SpamText = Text end })
+ChatTab:AddSlider({ Name = "Spam Delay (Seconds)", Min = 1, Max = 10, Increment = 1, Default = 2, Callback = function(Value) SpamDelay = Value end })
+ChatTab:AddToggle({
+    Name = "Enable Chat Spam",
+    Default = false,
+    Flag = "SpamToggle",
+    Callback = function(Value)
+        playSound("rbxassetid://906086442", 0.5)
+        SpamActive = Value
+        if SpamActive then
+            task.spawn(function()
+                while SpamActive do
+                    SendChatMessage(SpamText)
+                    task.wait(SpamDelay)
+                end
+            end)
+        end
+    end
+})
+
+-- SETTINGS
+MiscTab:AddSection("Utilities")
+MiscTab:AddToggle({ Name = "Anti-AFK", Default = true, Flag = "AntiAFK", Callback = function(Value) playSound("rbxassetid://906086442", 0.5) PulseUI.Utils.AntiAFK(Value) end })
+MiscTab:AddButton({ Name = "Rejoin", Callback = function() playSound("rbxassetid://6029744634", 0.5) PulseUI.Utils.Rejoin() end })
+MiscTab:AddButton({ Name = "Server Hop", Callback = function() playSound("rbxassetid://6029744634", 0.5) PulseUI.Utils.ServerHop() end })
+
+PulseUI:Notify({
+    Title = "ScriptsByMateo Ready",
+    Content = "Interface fully loaded successfully.",
+    Type = "Success",
+    Duration = 4
+})
